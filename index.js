@@ -29,7 +29,12 @@ function removeHook (hook) {
 function callHookFn (hookFn, namespace, name, baseDir) {
   const newDefault = hookFn(namespace, name, baseDir)
   if (newDefault && newDefault !== namespace) {
-    namespace.default = newDefault
+    // Only ESM modules that actually export `default` can have it reassigned.
+    // Some hooks return a value unconditionally; avoid crashing when the module
+    // has no default export (see issue #188).
+    if ('default' in namespace) {
+      namespace.default = newDefault
+    }
   }
 }
 
