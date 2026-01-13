@@ -127,9 +127,12 @@ function Hook (modules, options, hookFn) {
       name = name.replace(/^node:/, '')
     } else {
       if (name.startsWith('file://')) {
+        const stackTraceLimit = Error.stackTraceLimit
+        Error.stackTraceLimit = 0
         try {
           name = fileURLToPath(name)
         } catch (e) {}
+        Error.stackTraceLimit = stackTraceLimit
       }
       const details = parse(name)
       if (details) {

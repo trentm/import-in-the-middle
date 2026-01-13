@@ -21,6 +21,7 @@ const NODE_VERSION = process.versions.node.split('.')
 const NODE_MAJOR = Number(NODE_VERSION[0])
 const NODE_MINOR = Number(NODE_VERSION[1])
 const HANDLED_FORMATS = new Set(['builtin', 'module', 'commonjs'])
+const TRACE_WARNINGS = process.execArgv.includes('--trace-warnings')
 
 let getExports
 if (NODE_MAJOR >= 20 || (NODE_MAJOR === 18 && NODE_MINOR >= 19)) {
@@ -32,6 +33,10 @@ if (NODE_MAJOR >= 20 || (NODE_MAJOR === 18 && NODE_MINOR >= 19)) {
 let entrypoint
 
 function hasIitm (url) {
+  // Fast path: avoid URL parsing on the hot path when there's clearly no iitm.
+  if (typeof url !== 'string' || url.indexOf('iitm') === -1) {
+    return false
+  }
   try {
     return new URL(url).searchParams.has('iitm')
   } catch {
@@ -44,8 +49,14 @@ function isIitm (url, meta) {
 }
 
 function deleteIitm (url) {
+  // Fast path: avoid URL parsing / try-catch on bare specifiers and normal file URLs.
+  if (typeof url !== 'string' || url.indexOf('iitm') === -1) {
+    return url
+  }
   let resultUrl
+  const stackTraceLimit = Error.stackTraceLimit
   try {
+    Error.stackTraceLimit = 0
     const urlObj = new URL(url)
     if (urlObj.searchParams.has('iitm')) {
       urlObj.searchParams.delete('iitm')
@@ -62,6 +73,7 @@ function deleteIitm (url) {
   } catch {
     resultUrl = url
   }
+  Error.stackTraceLimit = stackTraceLimit
   return resultUrl
 }
 
@@ -115,12 +127,16 @@ function isBareSpecifier (specifier) {
     return !URL.canParse(specifier)
   }
 
+  const stackTraceLimit = Error.stackTraceLimit
   try {
+    Error.stackTraceLimit = 0
     // eslint-disable-next-line no-new
     new URL(specifier)
     return false
   } catch (err) {
     return true
+  } finally {
+    Error.stackTraceLimit = stackTraceLimit
   }
 }
 
@@ -141,7 +157,9 @@ function isBareSpecifierFileUrlOrRegex (input) {
     return false
   }
 
+  const stackTraceLimit = Error.stackTraceLimit
   try {
+    Error.stackTraceLimit = 0
     // eslint-disable-next-line no-new
     const url = new URL(input)
     // We consider node: URLs bare specifiers in this context
@@ -149,6 +167,8 @@ function isBareSpecifierFileUrlOrRegex (input) {
   } catch (err) {
     // Anything that fails parsing is a bare specifier
     return true
+  } finally {
+    Error.stackTraceLimit = stackTraceLimit
   }
 }
 
@@ -185,7 +205,7 @@ function emitWarning (err) {
   // Unfortunately, process.emitWarning does not output the full error
   // with error.cause like console.warn does so we need to inspect it when
   // tracing warnings
-  const warnMessage = process.execArgv.includes('--trace-warnings') ? inspect(err) : err
+  const warnMessage = TRACE_WARNINGS ? inspect(err) : err
   process.emitWarning(warnMessage)
 }
 
@@ -365,12 +385,21 @@ export function createHook (meta) {
     //
     // For non-bare specifier imports, we match to the full file URL because
     // using relative paths would be very error prone!
+    let resultPath
+    if (result.url.startsWith('file:')) {
+      const stackTraceLimit = Error.stackTraceLimit
+      Error.stackTraceLimit = 0
+      try {
+        resultPath = fileURLToPath(result.url)
+      } catch {}
+      Error.stackTraceLimit = stackTraceLimit
+    }
     function match (each) {
       if (each instanceof RegExp) {
         return each.test(result.url)
       }
 
-      return each === specifier || each === result.url || (result.url.startsWith('file:') && each === fileURLToPath(result.url))
+      return each === specifier || each === result.url || (resultPath && each === resultPath)
     }
 
     if (result.format && !HANDLED_FORMATS.has(result.format)) {
@@ -385,7 +414,7 @@ export function createHook (meta) {
       return result
     }
 
-    if (isIitm(parentURL, meta) || hasIitm(parentURL)) {
+    if (isIitm(parentURL, meta) || (parentURL && hasIitm(parentURL))) {
       return result
     }
 
