@@ -8,7 +8,7 @@ import { strictEqual } from 'assert'
 const nodeProcess = spawn('node', [
   '--loader',
   './hook.mjs',
-  './test/fixtures/cyclical-a.mjs'
+  './test/fixtures/cyclical-driver.mjs'
 ])
 
 // expected output should be 'testB\ntestA' but the hook fails when running against files
