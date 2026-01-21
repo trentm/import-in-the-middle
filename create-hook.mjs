@@ -61,9 +61,6 @@ function deleteIitm (url) {
     if (urlObj.searchParams.has('iitm')) {
       urlObj.searchParams.delete('iitm')
       resultUrl = urlObj.href
-      if (resultUrl.startsWith('file:node:')) {
-        resultUrl = resultUrl.replace('file:', '')
-      }
       if (resultUrl.startsWith('file:///node:')) {
         resultUrl = resultUrl.replace('file:///', '')
       }
