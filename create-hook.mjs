@@ -29,8 +29,6 @@ if (NODE_MAJOR > 16 || (NODE_MAJOR === 16 && NODE_MINOR >= 16)) {
   getExports = (url) => import(url).then(Object.keys)
 }
 
-let entrypoint
-
 function hasIitm (url) {
   // Fast path: avoid URL parsing on the hot path when there's clearly no iitm.
   if (typeof url !== 'string' || url.indexOf('iitm') === -1) {
@@ -71,28 +69,6 @@ function deleteIitm (url) {
   }
   Error.stackTraceLimit = stackTraceLimit
   return resultUrl
-}
-
-function isNodeMajor16AndMinor17OrGreater () {
-  return NODE_MAJOR === 16 && NODE_MINOR >= 17
-}
-
-function isFileProtocol (urlObj) {
-  return urlObj.protocol === 'file:'
-}
-
-function isNodeProtocol (urlObj) {
-  return urlObj.protocol === 'node:'
-}
-
-function needsToAddFileProtocol (urlObj) {
-  if (NODE_MAJOR === 17) {
-    return !isFileProtocol(urlObj)
-  }
-  if (isNodeMajor16AndMinor17OrGreater()) {
-    return !isFileProtocol(urlObj) && !isNodeProtocol(urlObj)
-  }
-  return !isFileProtocol(urlObj) && NODE_MAJOR < 18
 }
 
 /**
@@ -287,7 +263,7 @@ async function processModule ({ srcUrl, context, parentGetSource, parentResolve,
     } else {
       const variableName = `$${n.replace(/[^a-zA-Z0-9_$]/g, '_')}`
       const objectKey = JSON.stringify(n)
-      const reExportedName = n === 'default' || NODE_MAJOR < 16 ? n : objectKey
+      const reExportedName = n === 'default' ? n : objectKey
 
       addSetter(n, `
       let ${variableName}
@@ -324,7 +300,7 @@ async function processModule ({ srcUrl, context, parentGetSource, parentResolve,
 function addIitm (url) {
   const urlObj = new URL(url)
   urlObj.searchParams.set('iitm', 'true')
-  return needsToAddFileProtocol(urlObj) ? 'file:' + urlObj.href : urlObj.href
+  return urlObj.href
 }
 
 export function createHook (meta) {
@@ -386,13 +362,9 @@ export function createHook (meta) {
     // are evaluated, and can make them exit without doing anything.
     if (parentURL === '') {
       if (!EXTENSION_RE.test(result.url) && !hasIitm(result.url)) {
-        entrypoint = result.url
         return { url: result.url, format: 'commonjs' }
       }
-      if (NODE_MAJOR > 16 || (NODE_MAJOR === 16 && NODE_MINOR >= 16)) {
-        entrypoint = result.url
-        return result
-      }
+      return result
     }
 
     // For included/excluded modules, we check the specifier to match libraries
@@ -574,7 +546,6 @@ register(${JSON.stringify(realUrl)}, _, set, get, ${JSON.stringify(originalSpeci
     return parentGetSource(url, context)
   }
 
-  // For Node.js 16.12.0 and higher.
   async function load (url, context, parentLoad) {
     if (hasIitm(url)) {
       const result = await getSource(url, context, parentLoad)
@@ -595,28 +566,5 @@ register(${JSON.stringify(realUrl)}, _, set, get, ${JSON.stringify(originalSpeci
     return parentLoad(url, context)
   }
 
-  if (NODE_MAJOR >= 17 || (NODE_MAJOR === 16 && NODE_MINOR >= 12)) {
-    return { initialize, load, resolve }
-  } else {
-    return {
-      initialize,
-      load,
-      resolve,
-      getSource,
-      getFormat (url, context, parentGetFormat) {
-        if (hasIitm(url)) {
-          return {
-            format: 'module'
-          }
-        }
-        if (url === entrypoint) {
-          return {
-            format: 'commonjs'
-          }
-        }
-
-        return parentGetFormat(url, context)
-      }
-    }
-  }
+  return { initialize, load, resolve }
 }

@@ -4,6 +4,6 @@
 
 import { createHook } from './create-hook.mjs'
 
-const { initialize, load, resolve, getFormat, getSource } = createHook(import.meta)
+const { initialize, load, resolve } = createHook(import.meta)
 
-export { initialize, load, resolve, getFormat, getSource }
+export { initialize, load, resolve }

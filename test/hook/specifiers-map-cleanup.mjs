@@ -2,8 +2,8 @@ import { spawnSync } from 'child_process'
 import { strictEqual } from 'assert'
 
 const [NODE_MAJOR, NODE_MINOR] = process.versions.node.split('.').map(Number)
-if (NODE_MAJOR < 18 || (NODE_MAJOR === 18 && NODE_MINOR < 19)) {
-  console.log(`Skipping ${process.env.IITM_TEST_FILE || import.meta.url} as this is Node.js v${NODE_MAJOR} and test wants >=v18`)
+if (NODE_MAJOR === 18 && NODE_MINOR < 19) {
+  console.log(`Skipping ${process.env.IITM_TEST_FILE || import.meta.url} as this is Node.js v${NODE_MAJOR}.${NODE_MINOR} and test wants >=v18.19`)
   process.exit(0)
 }
 

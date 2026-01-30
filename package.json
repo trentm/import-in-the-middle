@@ -2,6 +2,9 @@
   "name": "import-in-the-middle",
   "version": "2.0.6",
   "description": "Intercept imports in Node.js",
+  "engines": {
+    "node": ">=18"
+  },
   "main": "index.js",
   "scripts": {
     "test": "c8 --reporter lcov --check-coverage --lines 45 imhotap --files test/{hook,low-level,other,get-esm-exports,register}/*",

@@ -34,5 +34,3 @@ export async function initialize (data) {
 
 export const load = selected.load
 export const resolve = selected.resolve
-export const getFormat = selected.getFormat
-export const getSource = selected.getSource
